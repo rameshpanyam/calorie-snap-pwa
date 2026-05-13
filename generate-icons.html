@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head><title>Generate Icons — Calorie Snap</title>
+<style>
+  body { font-family: -apple-system, sans-serif; background: #0f0f13; color: #e8e8ee; padding: 30px; }
+  canvas { background: #22c55e; border-radius: 28%; margin: 10px 0; }
+  button { background: #22c55e; color: #0f1810; padding: 10px 18px; border: 0; border-radius: 8px; cursor: pointer; font-weight: 600; }
+  a { color: #22c55e; }
+</style>
+</head>
+<body>
+<h1>🥗 Calorie Snap — Icon Generator</h1>
+<p>Open this file in a browser, click Generate, then right-click each canvas → Save As: <code>icons/icon-192.png</code> and <code>icons/icon-512.png</code>.</p>
+<button onclick="gen()">Generate Icons</button>
+<div id="out"></div>
+<script>
+function gen() {
+  const out = document.getElementById('out');
+  out.innerHTML = '';
+  [192, 512].forEach(size => {
+    const c = document.createElement('canvas');
+    c.width = size; c.height = size;
+    const ctx = c.getContext('2d');
+    // Green rounded background
+    ctx.fillStyle = '#22c55e';
+    const r = size * 0.22;
+    roundRect(ctx, 0, 0, size, size, r);
+    ctx.fill();
+    // Emoji centered
+    ctx.font = (size * 0.55) + 'px -apple-system, Apple Color Emoji, sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('🥗', size/2, size/2 + size*0.03);
+    const wrap = document.createElement('div');
+    wrap.innerHTML = '<p><b>icon-' + size + '.png</b></p>';
+    wrap.appendChild(c);
+    out.appendChild(wrap);
+  });
+}
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x+r, y);
+  ctx.arcTo(x+w, y,   x+w, y+h, r);
+  ctx.arcTo(x+w, y+h, x,   y+h, r);
+  ctx.arcTo(x,   y+h, x,   y,   r);
+  ctx.arcTo(x,   y,   x+w, y,   r);
+  ctx.closePath();
+}
+</script>
+</body></html>

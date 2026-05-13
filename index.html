@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
+  <meta name="theme-color" content="#22c55e" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+
+  <title>Calorie Snap</title>
+  <link rel="stylesheet" href="style.css?v=1.0" />
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
+  <!-- ZXing barcode reader -->
+  <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.0/umd/index.min.js" defer></script>
+</head>
+<body>
+
+<!-- ═══════════ TOP BAR ═══════════ -->
+<header class="top">
+  <div class="top-title">
+    <span class="brand">🥗 Calorie Snap</span>
+  </div>
+  <div class="top-goal" id="topGoalPill" hidden>
+    <span id="topGoalText">0 / 2000</span>
+    <span class="top-goal-bar"><span id="topGoalFill"></span></span>
+  </div>
+</header>
+
+<!-- ═══════════ VIEWS ═══════════ -->
+<main id="appMain">
+
+  <!-- ───── SNAP TAB (default) ───── -->
+  <section class="view active" id="view-snap">
+    <!-- Mode switcher -->
+    <div class="mode-switch" role="tablist">
+      <button class="mode-btn active" data-mode="camera"  role="tab">📷 Snap</button>
+      <button class="mode-btn"        data-mode="barcode" role="tab">📦 Barcode</button>
+      <button class="mode-btn"        data-mode="search"  role="tab">⌨️ Search</button>
+      <button class="mode-btn"        data-mode="custom"  role="tab">⭐ My Foods</button>
+    </div>
+
+    <!-- CAMERA mode -->
+    <div class="mode-panel" id="panel-camera" data-panel="camera">
+      <div class="snap-hero">
+        <div class="snap-emoji">📸</div>
+        <p class="snap-tagline">Snap a meal. Know calories in 10 seconds.</p>
+      </div>
+      <div class="snap-actions">
+        <button class="btn-primary big" id="btnCapture">📷 Take Photo</button>
+        <button class="btn-secondary" id="btnGallery">🖼️ Choose from gallery</button>
+      </div>
+      <input type="file" accept="image/*" capture="environment" id="fileCapture" hidden />
+      <input type="file" accept="image/*" id="fileGallery" hidden />
+      <p class="snap-hint" id="snapKeyHint" hidden>
+        ⚠️ Set your free Gemini API key in <a href="#" id="toSettings">Settings</a> to enable photo recognition.
+      </p>
+    </div>
+
+    <!-- BARCODE mode -->
+    <div class="mode-panel" id="panel-barcode" data-panel="barcode" hidden>
+      <div class="barcode-stage">
+        <video id="barcodeVideo" playsinline></video>
+        <div class="barcode-reticle"></div>
+      </div>
+      <button class="btn-primary" id="btnBarcodeStart">▶️ Start scanning</button>
+      <button class="btn-secondary" id="btnBarcodeStop" hidden>⏹️ Stop</button>
+      <p class="snap-hint">Point at any packaged-food barcode.</p>
+    </div>
+
+    <!-- SEARCH mode -->
+    <div class="mode-panel" id="panel-search" data-panel="search" hidden>
+      <input type="search" id="searchInput" placeholder="Search foods (e.g. roti, dosa, oats)…" autocomplete="off" />
+      <ul id="searchResults" class="search-results"></ul>
+    </div>
+
+    <!-- MY FOODS mode -->
+    <div class="mode-panel" id="panel-custom" data-panel="custom" hidden>
+      <h3 class="panel-h">⭐ My saved meals</h3>
+      <ul id="customList" class="custom-list">
+        <li class="empty">No saved meals yet. Save any logged meal as a custom for one-tap re-logging.</li>
+      </ul>
+    </div>
+
+    <!-- ── Result panel (shown after capture / barcode / search) ── -->
+    <div class="result-panel" id="resultPanel" hidden>
+      <div class="result-head">
+        <h3 id="resultTitle">Confirm your meal</h3>
+        <button class="icon-btn" id="resultClose" title="Cancel">✕</button>
+      </div>
+      <div class="result-loading" id="resultLoading" hidden>
+        <div class="spinner"></div>
+        <p>Recognising your meal…</p>
+      </div>
+      <img class="result-photo" id="resultPhoto" hidden />
+      <ul class="result-items" id="resultItems"></ul>
+      <button class="btn-text" id="addItem">+ Add another item</button>
+
+      <div class="result-totals">
+        <div class="total-kcal"><span class="approx">~</span><span id="totalKcal">0</span><span class="unit">kcal</span></div>
+        <div class="macro-row">
+          <span class="macro">P <b id="totalP">0</b>g</span>
+          <span class="macro">C <b id="totalC">0</b>g</span>
+          <span class="macro">F <b id="totalF">0</b>g</span>
+        </div>
+      </div>
+
+      <div class="result-meal-row">
+        <label>Meal:</label>
+        <select id="mealType">
+          <option value="breakfast">🌅 Breakfast</option>
+          <option value="lunch">🍱 Lunch</option>
+          <option value="snack">🍪 Snack</option>
+          <option value="dinner">🌙 Dinner</option>
+        </select>
+      </div>
+
+      <div class="result-cta">
+        <button class="btn-secondary" id="btnSaveCustom">⭐ Save as custom</button>
+        <button class="btn-primary"   id="btnLogMeal">✓ Log to Today</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ───── TODAY TAB ───── -->
+  <section class="view" id="view-today">
+    <div class="today-summary">
+      <div class="today-date" id="todayDate">Today</div>
+      <div class="today-rings">
+        <div class="ring-kcal">
+          <svg viewBox="0 0 100 100" class="ring-svg">
+            <circle cx="50" cy="50" r="42" class="ring-bg"></circle>
+            <circle cx="50" cy="50" r="42" class="ring-fg" id="todayRing"></circle>
+          </svg>
+          <div class="ring-center">
+            <div class="ring-num" id="todayKcalNum">0</div>
+            <div class="ring-sub">of <span id="todayKcalGoal">2000</span></div>
+          </div>
+        </div>
+        <div class="macros-stack">
+          <div class="macro-bar">
+            <span class="macro-lbl">Protein</span>
+            <span class="macro-val"><b id="todayP">0</b>g</span>
+            <div class="macro-progress"><div id="todayPBar"></div></div>
+          </div>
+          <div class="macro-bar">
+            <span class="macro-lbl">Carbs</span>
+            <span class="macro-val"><b id="todayC">0</b>g</span>
+            <div class="macro-progress"><div id="todayCBar"></div></div>
+          </div>
+          <div class="macro-bar">
+            <span class="macro-lbl">Fat</span>
+            <span class="macro-val"><b id="todayF">0</b>g</span>
+            <div class="macro-progress"><div id="todayFBar"></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="today-status" id="todayStatus"></div>
+    </div>
+
+    <div id="todayMealGroups"></div>
+
+    <div class="today-empty" id="todayEmpty" hidden>
+      <div class="empty-emoji">🍽️</div>
+      <p>No meals logged yet today.</p>
+      <button class="btn-primary" id="btnGoSnap">📷 Log first meal</button>
+    </div>
+  </section>
+
+  <!-- ───── INSIGHTS TAB ───── -->
+  <section class="view" id="view-insights">
+    <h2 class="view-h">📊 Insights</h2>
+
+    <div class="insight-card">
+      <p class="insight-title">7-day calorie trend</p>
+      <canvas id="kcalChart" height="180"></canvas>
+    </div>
+
+    <div class="insight-card">
+      <p class="insight-title">Macro split (last 7 days)</p>
+      <canvas id="macroChart" height="180"></canvas>
+    </div>
+
+    <div class="insight-card">
+      <p class="insight-title">Highlights</p>
+      <ul class="callouts" id="callouts">
+        <li class="empty">Log a few meals to see insights.</li>
+      </ul>
+    </div>
+
+    <div class="insight-card">
+      <p class="insight-title">Streak</p>
+      <div class="streak-row">
+        <div class="streak-num" id="streakNum">0</div>
+        <div class="streak-sub">day streak<br><span id="streakHint">Log a meal today to start</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ───── SETTINGS TAB ───── -->
+  <section class="view" id="view-settings">
+    <h2 class="view-h">⚙️ Settings</h2>
+
+    <div class="settings-card">
+      <p class="set-title">🔑 Gemini API key (free, BYO)</p>
+      <p class="set-help">
+        Get a free key at <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">aistudio.google.com</a>
+        (30 seconds, no card needed). Stored locally only.
+      </p>
+      <div class="set-input-row">
+        <input type="password" id="geminiKey" placeholder="AIza..." autocomplete="off" />
+        <button class="btn-secondary" id="btnToggleKeyVis" type="button">👁</button>
+      </div>
+      <div class="set-actions">
+        <button class="btn-primary" id="btnSaveKey">Save & test</button>
+        <span class="set-status" id="keyStatus"></span>
+      </div>
+    </div>
+
+    <div class="settings-card">
+      <p class="set-title">🎯 Daily goal</p>
+      <label>Calories (kcal)
+        <input type="number" id="goalKcal" min="800" max="6000" step="50" value="2000" />
+      </label>
+      <details>
+        <summary>Macro targets (optional)</summary>
+        <label>Protein (g) <input type="number" id="goalP" min="0" max="400" step="5" /></label>
+        <label>Carbs (g)   <input type="number" id="goalC" min="0" max="800" step="5" /></label>
+        <label>Fat (g)     <input type="number" id="goalF" min="0" max="300" step="5" /></label>
+      </details>
+      <button class="btn-primary" id="btnSaveGoals">Save goals</button>
+    </div>
+
+    <div class="settings-card">
+      <p class="set-title">☁️ Google Sheets sync (optional)</p>
+      <p class="set-help">Mirror meals + goals to your own Google Sheet. Same backup pattern as Expense Tracker.</p>
+      <div class="set-actions">
+        <button class="btn-secondary" id="btnSheetsToggle">Enable sync</button>
+        <span class="set-status" id="sheetsStatus">Off</span>
+      </div>
+    </div>
+
+    <div class="settings-card">
+      <p class="set-title">📥 Export / 🗑️ Clear</p>
+      <div class="set-actions">
+        <button class="btn-secondary" id="btnExport">Export JSON</button>
+        <button class="btn-danger"    id="btnClear">Clear all data</button>
+      </div>
+    </div>
+
+    <div class="settings-card">
+      <p class="set-title">ℹ️ About</p>
+      <p class="set-help">
+        Calorie Snap v1.0 — point your camera at any food, AI estimates calories.<br>
+        Values are estimates (±15–25%). Edit any item that looks wrong.<br>
+        Photos are sent only to Google's Gemini API. Nothing leaves your device unless you enable sync.
+      </p>
+    </div>
+  </section>
+
+</main>
+
+<!-- ═══════════ BOTTOM NAV ═══════════ -->
+<nav class="bottom-nav">
+  <button class="nav-btn active" data-view="snap">     <span>📷</span><label>Snap</label></button>
+  <button class="nav-btn"        data-view="today">    <span>📋</span><label>Today</label></button>
+  <button class="nav-btn"        data-view="insights"> <span>📊</span><label>Insights</label></button>
+  <button class="nav-btn"        data-view="settings"> <span>⚙️</span><label>Settings</label></button>
+</nav>
+
+<!-- ═══════════ MODALS ═══════════ -->
+
+<!-- First-run / onboarding -->
+<div class="modal" id="onboardModal" hidden>
+  <div class="modal-box">
+    <h2>👋 Welcome to Calorie Snap</h2>
+    <p>Three ways to log a meal:</p>
+    <ul class="onboard-list">
+      <li><b>📷 Snap</b> — photo of any cooked meal (AI estimates)</li>
+      <li><b>📦 Barcode</b> — exact macros for packaged food</li>
+      <li><b>⌨️ Search</b> — type to find 500+ foods, offline</li>
+    </ul>
+    <p>For 📷 Snap, you'll need a free Gemini API key (30-second setup).</p>
+    <div class="modal-actions">
+      <button class="btn-secondary" id="onboardSkip">Skip for now</button>
+      <button class="btn-primary"   id="onboardGo">Set up Gemini key</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit single item modal -->
+<div class="modal" id="editItemModal" hidden>
+  <div class="modal-box">
+    <h3>Edit item</h3>
+    <label>Name
+      <input type="text" id="editName" />
+    </label>
+    <label>Grams
+      <input type="number" id="editGrams" min="1" max="2000" step="1" />
+    </label>
+    <div class="portion-chips">
+      <button class="chip" data-mult="0.25">¼</button>
+      <button class="chip" data-mult="0.5">½</button>
+      <button class="chip" data-mult="1">1</button>
+      <button class="chip" data-mult="1.5">1½</button>
+      <button class="chip" data-mult="2">2</button>
+    </div>
+    <div class="edit-macros-grid">
+      <label>kcal <input type="number" id="editKcal" min="0" max="3000" step="1" /></label>
+      <label>P (g) <input type="number" id="editP" min="0" max="200" step="0.1" /></label>
+      <label>C (g) <input type="number" id="editC" min="0" max="400" step="0.1" /></label>
+      <label>F (g) <input type="number" id="editF" min="0" max="200" step="0.1" /></label>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-danger"  id="editDelete">Delete</button>
+      <button class="btn-secondary" id="editCancel">Cancel</button>
+      <button class="btn-primary"   id="editSave">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Save-as-custom modal -->
+<div class="modal" id="saveCustomModal" hidden>
+  <div class="modal-box">
+    <h3>Save as custom meal</h3>
+    <label>Name <input type="text" id="customName" placeholder="My usual breakfast" /></label>
+    <div class="modal-actions">
+      <button class="btn-secondary" id="customCancel">Cancel</button>
+      <button class="btn-primary"   id="customSaveBtn">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm wipe modal -->
+<div class="modal" id="wipeModal" hidden>
+  <div class="modal-box">
+    <h3>🗑️ Clear all data?</h3>
+    <p>This deletes all meals, custom foods, goals, and your API key from this device. This cannot be undone.</p>
+    <div class="modal-actions">
+      <button class="btn-secondary" id="wipeCancel">Cancel</button>
+      <button class="btn-danger"    id="wipeConfirm">Delete everything</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast container -->
+<div id="toast" class="toast" hidden></div>
+
+<script src="app.js?v=1.0"></script>
+<script src="features.js?v=1.0"></script>
+</body>
+</html>
