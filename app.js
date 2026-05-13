@@ -211,7 +211,7 @@ async function loadCustomFoods() {
 /* ───────────── Foods DB ───────────── */
 async function loadFoodsDB() {
   try {
-    var res = await fetch('foods-db.json?v=1.0.1');
+    var res = await fetch('foods-db.json?v=1.0.2');
     foodsDB = await res.json();
   } catch (e) {
     console.warn('foods-db.json failed to load', e);

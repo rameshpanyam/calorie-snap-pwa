@@ -1,19 +1,28 @@
 // Calorie Snap — Service Worker
-// Cache-first for shell, network-first for everything else.
-const CACHE_NAME = 'calorie-snap-v1.0.1';
+// Strategy: network-first for navigation + HTML (always pick up latest shell),
+// cache-first for static immutable assets (versioned via ?v= query string),
+// passthrough for external APIs.
+const CACHE_NAME = 'calorie-snap-v1.0.2';
 const BASE = self.registration.scope;
 const SHELL = [
   BASE,
   BASE + 'index.html',
-  BASE + 'style.css?v=1.0.1',
-  BASE + 'app.js?v=1.0.1',
-  BASE + 'features.js?v=1.0.1',
-  BASE + 'foods-db.json?v=1.0.1',
+  BASE + 'style.css?v=1.0.2',
+  BASE + 'app.js?v=1.0.2',
+  BASE + 'features.js?v=1.0.2',
+  BASE + 'foods-db.json?v=1.0.2',
   BASE + 'manifest.json',
 ];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(SHELL)));
+  // Don't fail install if one asset can't be cached (e.g., 404 during deploy).
+  e.waitUntil(
+    caches.open(CACHE_NAME).then(c =>
+      Promise.all(SHELL.map(url =>
+        fetch(url, { cache: 'no-cache' }).then(r => r.ok && c.put(url, r)).catch(() => null)
+      ))
+    )
+  );
   self.skipWaiting();
 });
 
@@ -21,20 +30,40 @@ self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys().then(keys =>
       Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
-    )
+    ).then(() => self.clients.claim())
   );
-  self.clients.claim();
+});
+
+// Message channel — let pages force-refresh the SW from the app.
+self.addEventListener('message', e => {
+  if (e.data === 'SKIP_WAITING') self.skipWaiting();
 });
 
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
-  // Don't intercept Gemini or Open Food Facts API calls — let them pass through.
   const url = event.request.url;
+  // Passthrough for external APIs
   if (url.includes('generativelanguage.googleapis.com') ||
       url.includes('openfoodfacts.org') ||
       url.includes('sheets.googleapis.com') ||
-      url.includes('accounts.google.com')) return;
+      url.includes('accounts.google.com') ||
+      url.includes('cdn.jsdelivr.net')) return;
 
+  const isNavigate = event.request.mode === 'navigate' || event.request.destination === 'document';
+
+  // Network-first for HTML / navigation so a deploy lands immediately.
+  if (isNavigate) {
+    event.respondWith(
+      fetch(event.request).then(res => {
+        const clone = res.clone();
+        caches.open(CACHE_NAME).then(c => c.put(event.request, clone));
+        return res;
+      }).catch(() => caches.match(event.request).then(c => c || caches.match(BASE + 'index.html')))
+    );
+    return;
+  }
+
+  // Cache-first for everything else (versioned assets, fonts, JSON, etc).
   event.respondWith(
     caches.match(event.request).then(cached => {
       if (cached) return cached;
@@ -44,11 +73,7 @@ self.addEventListener('fetch', event => {
           caches.open(CACHE_NAME).then(c => c.put(event.request, clone));
         }
         return res;
-      }).catch(() => {
-        if (event.request.mode === 'navigate') {
-          return caches.match(self.registration.scope + 'index.html');
-        }
-      });
+      }).catch(() => null);
     })
   );
 });
