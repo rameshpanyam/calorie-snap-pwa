@@ -88,6 +88,7 @@
   }
 
   /* ═════════════════ F1. Gemini vision ═════════════════ */
+  // Returns { ok: bool, status: 'ok'|'rate_limited'|'auth'|'network'|'unknown', message: string }
   async function testGeminiKey(key) {
     try {
       var url = GEMINI_BASE + GEMINI_MODEL + ':generateContent?key=' + encodeURIComponent(key);
@@ -98,11 +99,27 @@
           contents: [{ parts: [{ text: 'Reply with the single word: OK' }] }]
         })
       });
-      if (!res.ok) return false;
-      var j = await res.json();
-      var txt = j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts && j.candidates[0].content.parts[0] && j.candidates[0].content.parts[0].text;
-      return !!txt;
-    } catch (e) { return false; }
+      if (res.ok) {
+        var j = await res.json();
+        var txt = j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts && j.candidates[0].content.parts[0] && j.candidates[0].content.parts[0].text;
+        if (txt) return { ok: true, status: 'ok', message: '✓ Saved' };
+        return { ok: false, status: 'unknown', message: '✗ Unexpected response' };
+      }
+      // Distinguish quota / auth / other errors so user knows whether to wait or re-issue.
+      if (res.status === 429) {
+        return { ok: false, status: 'rate_limited', message: '⏳ Rate-limited — key is valid, wait ~1 min' };
+      }
+      if (res.status === 401 || res.status === 403) {
+        return { ok: false, status: 'auth', message: '✗ Invalid key (auth failed)' };
+      }
+      if (res.status === 400) {
+        // 400 often = malformed key (wrong length / chars)
+        return { ok: false, status: 'auth', message: '✗ Invalid key (bad format)' };
+      }
+      return { ok: false, status: 'unknown', message: '✗ Gemini error ' + res.status };
+    } catch (e) {
+      return { ok: false, status: 'network', message: '✗ Network error — check connection' };
+    }
   }
 
   async function recogniseFoodFromImage(imageDataUrl) {

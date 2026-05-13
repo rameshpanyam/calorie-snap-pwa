@@ -2,15 +2,15 @@
 // Strategy: network-first for navigation + HTML (always pick up latest shell),
 // cache-first for static immutable assets (versioned via ?v= query string),
 // passthrough for external APIs.
-const CACHE_NAME = 'calorie-snap-v1.0.2';
+const CACHE_NAME = 'calorie-snap-v1.0.3';
 const BASE = self.registration.scope;
 const SHELL = [
   BASE,
   BASE + 'index.html',
-  BASE + 'style.css?v=1.0.2',
-  BASE + 'app.js?v=1.0.2',
-  BASE + 'features.js?v=1.0.2',
-  BASE + 'foods-db.json?v=1.0.2',
+  BASE + 'style.css?v=1.0.3',
+  BASE + 'app.js?v=1.0.3',
+  BASE + 'features.js?v=1.0.3',
+  BASE + 'foods-db.json?v=1.0.3',
   BASE + 'manifest.json',
 ];
 

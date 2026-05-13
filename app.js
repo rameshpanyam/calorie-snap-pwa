@@ -211,7 +211,7 @@ async function loadCustomFoods() {
 /* ───────────── Foods DB ───────────── */
 async function loadFoodsDB() {
   try {
-    var res = await fetch('foods-db.json?v=1.0.2');
+    var res = await fetch('foods-db.json?v=1.0.3');
     foodsDB = await res.json();
   } catch (e) {
     console.warn('foods-db.json failed to load', e);
@@ -475,13 +475,21 @@ async function boot() {
     var st = document.getElementById('keyStatus');
     if (!key) { st.textContent = 'Empty'; st.className = 'set-status err'; return; }
     st.textContent = 'Testing…'; st.className = 'set-status';
-    var ok = window.testGeminiKey ? await window.testGeminiKey(key) : true;
-    if (ok) {
+    var result = window.testGeminiKey
+      ? await window.testGeminiKey(key)
+      : { ok: true, status: 'ok', message: '✓ Saved' };
+    // Back-compat: tolerate old boolean return.
+    if (typeof result === 'boolean') result = { ok: result, status: result ? 'ok' : 'unknown', message: result ? '✓ Saved' : '✗ Invalid' };
+    // Save the key when it's clearly valid OR when we hit a rate-limit
+    // (rate-limit means the key authed successfully — just over quota).
+    if (result.ok || result.status === 'rate_limited') {
       await saveSetting('geminiApiKey', key);
-      st.textContent = '✓ Saved'; st.className = 'set-status ok';
+      st.textContent = result.message;
+      st.className = 'set-status ' + (result.ok ? 'ok' : 'warn');
       refreshSnapHints();
     } else {
-      st.textContent = '✗ Invalid'; st.className = 'set-status err';
+      st.textContent = result.message;
+      st.className = 'set-status err';
     }
   };
   document.getElementById('btnSaveGoals').onclick = async () => {

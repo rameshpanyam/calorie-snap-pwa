@@ -310,6 +310,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .set-status { color: var(--txt-dim); font-size: 13px; }
 .set-status.ok    { color: var(--accent); }
 .set-status.err   { color: var(--danger); }
+.set-status.warn  { color: #f59e0b; }
 .settings-card label {
   display: block; color: var(--txt-dim); font-size: 13px; margin-bottom: 10px;
 }
