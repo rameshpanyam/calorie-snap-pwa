@@ -1,14 +1,14 @@
 // Calorie Snap — Service Worker
 // Cache-first for shell, network-first for everything else.
-const CACHE_NAME = 'calorie-snap-v1.0';
+const CACHE_NAME = 'calorie-snap-v1.0.1';
 const BASE = self.registration.scope;
 const SHELL = [
   BASE,
   BASE + 'index.html',
-  BASE + 'style.css?v=1.0',
-  BASE + 'app.js?v=1.0',
-  BASE + 'features.js?v=1.0',
-  BASE + 'foods-db.json?v=1.0',
+  BASE + 'style.css?v=1.0.1',
+  BASE + 'app.js?v=1.0.1',
+  BASE + 'features.js?v=1.0.1',
+  BASE + 'foods-db.json?v=1.0.1',
   BASE + 'manifest.json',
 ];
 
